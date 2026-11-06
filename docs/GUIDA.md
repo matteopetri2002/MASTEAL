@@ -17,9 +17,9 @@ Metodo di lavoro: `checklist-agentica-completa.md` dell'utente (fasi 0→7, Issu
 
 ## Stato attuale
 
-- **Fase:** 5 — loop di sviluppo (Issue #1 e #2 chiuse; 12 rimanenti)
+- **Fase:** 5 — loop di sviluppo (Issue #1, #2 e #3 chiuse; 11 rimanenti)
 - **Repository:** https://github.com/matteopetri2002/MASTEAL
-- **Prossimo passo:** Issue #3 — RefTransport: import file, waveform, trasporto, A/B.
+- **Prossimo passo:** Issue #4 — LoudnessMeter BS.1770-4 + TruePeakMeter (branch `feature/loudness-meter`).
 
 ## Procedura di bootstrap (sintesi)
 
@@ -58,7 +58,8 @@ Metodo di lavoro: `checklist-agentica-completa.md` dell'utente (fasi 0→7, Issu
 
 ### Step attuale
 - [x] Issue #1 e #2 completate (PR #15 e #16, review umana FL Studio OK)
-- [ ] Issue #3 — feat: RefTransport — import file, waveform, trasporto, A/B
+- [x] Issue #3 completata (PR #17 squash-merge `0b3a833`, review umana FL Studio OK: include re-test post-crash)
+- [ ] Issue #4 — feat: LoudnessMeter BS.1770-4 + TruePeakMeter
 
 ### Backlog (ordine di lavoro = numero Issue)
 
@@ -97,6 +98,8 @@ riferimento riusa gli stessi analyzer del realtime. Contenuto e dipendenze invar
 - **2026-11-06** — Issue #1: prima build fallita per Command Line Tools corrotti (`'algorithm' file not found`, `usr/include/c++/v1` con soli 3 file, nessuna ricevuta pkgutil). Utente reinstallato i CLT (ora clang 21): toolchain verificato OK. Vedi "Lezioni apprese".
 - **2026-11-06** — Issue #1 chiusa: PR #15 squash-mergiata in develop (`50fc8db`), branch eliminato, review umana OK in FL Studio (passthrough invariato, GUI placeholder, nessun crash). Fix lungo la strada: `LANGUAGES C CXX`, API `UnitTestRunner` (somma `getResult(i)->failures`), `add_test` con `$<TARGET_FILE:...>`, `BUNDLE_ID` esplicito senza spazi.
 - **2026-11-06** — Issue #2 chiusa: PR #16 squash-mergiata (`8572ea0`). 10 parametri APVTS + SharedState lock-free + harness test SharedState. Feedback utente esplicito: GUI finale da portare a livello "plugin professionale" (assegnata a #7/#14, registrata in "Aperto / da decidere").
+- **2026-11-06** — Issue #3 chiusa: PR #17 squash-mergiata (`0b3a833`). RefTransport completo: import WAV/AIFF/FLAC/MP3 (chooser + drag&drop), waveform con regione drag/double-click, trasporto play/stop/loop, A/B crossfade 10 ms. Review umana OK in FL Studio dopo re-test.
+- **2026-11-06** — Crash su FL Studio alla chiusura finestra diagnosticato e risolto (PR #17, commit `6ea2c3e`): log `.ips` (`memory corruption of free block`) + riproduzione in test con backtrace. Causa: attachment APVTS dichiarati PRIMA dei controlli nel `Editor` → distrutti DOPO i controlli → use-after-free nel distruttore dell'attachment. Altri fix: `juce::String lastError` mai thread-safe → ora solo sotto `errorLock` (CriticalSection dedicato, mai dal thread audio); thread load detached → `juce::ThreadPool` posseduto con job joined nel distruttore; Play alza automaticamente `abMonitor` via `setValueNotifyingHost`. Lezioni: (1) regola di lifetime JUCE: attachment APVTS SEMPRE dichiarati dopo i controlli; (2) `juce::String` non thread-safe cross-thread senza lock; (3) mai `std::thread` detached in un plugin (pattone: `juce::ThreadPool` + `removeAllJobs` nel distruttore); (4) crash log `.ips` + lldb `--batch -k 'bt 50'` per il backtrace dopo crash; (5) `juce::SpinLock` non ricorsivo (deadlock risolto in `resetRegion`).
 
 ## Lezioni apprese
 
