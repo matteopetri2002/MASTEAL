@@ -1,6 +1,18 @@
 #include <juce_core/juce_core.h>
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <iostream>
+
+//==============================================================================
+/** Flushing logger: lets us see test progress even while piping. */
+class FlushingLogger : public juce::Logger
+{
+public:
+    void logMessage (const juce::String& message) override
+    {
+        std::cerr << message << std::endl;
+    }
+};
 
 //==============================================================================
 /** Sanity test: verifies the test harness works. Real analysis/DSP tests
@@ -33,7 +45,12 @@ int main (int argc, char** argv)
     juce::ignoreUnused (argc, argv);
     juce::ScopedJuceInitialiser_GUI juceInitialiser;
 
+    FlushingLogger logger;
+    juce::Logger::setCurrentLogger (&logger);
+
     juce::UnitTestRunner runner;
+    runner.setAssertOnFailure (false);
+    runner.setPassesAreLogged (true);
     runner.runAllTests();
 
     int failures = 0;

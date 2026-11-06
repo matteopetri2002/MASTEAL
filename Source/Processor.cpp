@@ -68,14 +68,17 @@ Processor::Processor()
     abMonitorParam  = apvts.getRawParameterValue ("abMonitor");
 
     jassert (amountParam != nullptr && bypassParam != nullptr && abMonitorParam != nullptr);
+
+    refTransport.setSharedStateSink (&sharedState);
 }
 
 //==============================================================================
 void Processor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    juce::ignoreUnused (sampleRate, samplesPerBlock);
+    juce::ignoreUnused (samplesPerBlock);
     // No DSP yet, no latency. The lookahead limiter (issue #8) will update this.
     setLatencySamples (0);
+    refTransport.prepareForAudioProcessing (sampleRate);
 }
 
 void Processor::releaseResources()
@@ -93,24 +96,33 @@ bool Processor::isBusesLayoutSupported (const BusesLayout& layouts) const
 
 void Processor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
-    juce::ignoreUnused (midi, buffer);
+    juce::ignoreUnused (midi);
     juce::ScopedNoDenormals noDenormals;
 
     // Realtime-safe parameter reads (cached atomics, no APVTS tree lookups).
-    const bool bypassed    = bypassParam->load (std::memory_order_relaxed) > 0.5f;
-    const bool abMonitorOn = abMonitorParam->load (std::memory_order_relaxed) > 0.5f;
-    const float amount     = amountParam->load (std::memory_order_relaxed) * 0.01f;
+    const bool bypassed  = bypassParam->load (std::memory_order_relaxed) > 0.5f;
+    const bool abMonitor = abMonitorParam->load (std::memory_order_relaxed) > 0.5f;
 
-    juce::ignoreUnused (eqOnParam, stereoOnParam, dynOnParam, loudnessOnParam,
-                        modeParam, targetLufsParam, targetTpParam, amount);
+    if (bypassed) // bit-exact passthrough
+        return;
 
-    // Publish monitoring state for the UI (lock-free).
-    sharedState.abMonitorActive.store (abMonitorOn && ! bypassed,
+    refTransport.setAbMonitorWanted (abMonitor);
+
+    // A/B: replaces the input with the reference through a 10 ms ramp.
+    applyReferenceMonitor (buffer);
+
+    // (Analysis tap + match chain arrive with issues #4+ and #8+; they always
+    //  read the input BEFORE this path is replaced by the A/B monitor.)
+}
+
+//==============================================================================
+void Processor::applyReferenceMonitor (juce::AudioBuffer<float>& buffer)
+{
+    refTransport.mixReferenceInto (buffer);
+
+    // Keep the UI honest on what the output currently is.
+    sharedState.abMonitorActive.store (refTransport.isPlaying(),
                                        std::memory_order_relaxed);
-
-    // Passthrough skeleton: no reference loaded yet, so A/B and the match
-    // chain are inert. Modules arrive with issues #3 (transport/A-B) and
-    // #8+ (DSP chain), always after the pre-DSP analysis tap.
 }
 
 //==============================================================================

@@ -2,20 +2,24 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "SharedState.h"
+#include "reference/RefTransport.h"
 
 namespace masteal
 {
 
 //==============================================================================
-/** MASTEAL processor: owns the parameter tree (APVTS) and the lock-free
-    SharedState published to the UI.
+/** MASTEAL processor: owns the parameter tree (APVTS), the reference
+    transport and the lock-free SharedState published to the UI.
 
     Rules (see AGENTS.md / ARCHITECTURE.md):
     - processBlock must stay realtime-safe: no allocations, locks or I/O.
-      Parameters are read through cached std::atomic<float>* pointers.
+      Parameters are read through cached std::atomic<float>* pointers; the
+      only lock touched is the transport's pointer-swap spinlock.
     - Any latency introduced must be declared via setLatencySamples().
-    - The DSP chain arrives with issues #8+; analysis taps the input *before*
-      the chain (issues #4+).
+    - A/B (issue #3) replaces the input with the reference clip when the
+      abMonitor parameter is on and the transport is playing; a 10 ms ramp
+      prevents clicks. This is a real-time passthrough until issue #8+ adds
+      the match chain, which will always sit AFTER the (pre-DSP) analysis tap.
 */
 class Processor : public juce::AudioProcessor
 {
@@ -54,12 +58,16 @@ public:
     //==============================================================================
     SharedState& getSharedState() { return sharedState; }
     juce::AudioProcessorValueTreeState& getValueTreeState() { return apvts; }
+    RefTransport& getRefTransport() { return refTransport; }
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+    void applyReferenceMonitor (juce::AudioBuffer<float>& buffer);   // A/B crossfade path
 
     //==============================================================================
     juce::AudioProcessorValueTreeState apvts;
+    RefTransport refTransport;
+    SharedState sharedState;
 
     // Cached raw parameter pointers: realtime-safe atomic reads in processBlock.
     std::atomic<float>* amountParam      = nullptr;
@@ -72,8 +80,6 @@ private:
     std::atomic<float>* targetTpParam    = nullptr;
     std::atomic<float>* bypassParam      = nullptr;
     std::atomic<float>* abMonitorParam   = nullptr;
-
-    SharedState sharedState;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Processor)
 };
