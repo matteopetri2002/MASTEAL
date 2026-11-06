@@ -94,3 +94,10 @@ riferimento riusa gli stessi analyzer del realtime. Contenuto e dipendenze invar
 - **2026-11-06** — Fase 0: prerequisiti verificati, CMake installato via Homebrew, `.gitignore` creato.
 - **2026-11-06** — Fasi 1–3: scritti README.md, AGENTS.md, docs/SPEC.md, docs/ARCHITECTURE.md, docs/GUIDA.md. Bootstrap repo e protezione `main`.
 - **2026-11-06** — Fase 4: backlog approvato dall'utente, create 14 Issue (#1–#14) con verifica numerazione. Aggiustamento tecnico d'ordine: meter (#4–5) prima di OfflineAnalysis/Fingerprint (#6). Avvio Issue #1.
+- **2026-11-06** — Issue #1: prima build fallita per Command Line Tools corrotti (`'algorithm' file not found`, `usr/include/c++/v1` con soli 3 file, nessuna ricevuta pkgutil). Utente reinstallato i CLT (ora clang 21): toolchain verificato OK. Vedi "Lezioni apprese".
+
+## Lezioni apprese
+
+- **`'algorithm' file not found` con clang su macOS** → *causa:* installazione Command Line Tools corrotta/obsoleta dopo un aggiornamento di macOS (libreria C++ standard mancante). *Diagnosi:* `printf '#include <algorithm>\nint main(){}\n' > /tmp/t.cpp && clang++ /tmp/t.cpp` fallisce anche fuori progetto; `ls /Library/Developer/CommandLineTools/usr/include/c++/v1 | wc -l` ≈ 0. *Soluzione:* `sudo rm -rf /Library/Developer/CommandLineTools && xcode-select --install` (azione dell'utente, richiede sudo).
+- **JUCE via CMake richiede `LANGUAGES C CXX`** nel `project()`, non solo CXX: errore di configure "A C compiler is required to build targets that depend on JUCE".
+- **Non usare `| tail -N` sui comandi di build in diagnosi**: nasconde l'errore reale; rilanciare il solo configure con output completo.
