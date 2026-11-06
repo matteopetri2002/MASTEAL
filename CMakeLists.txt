@@ -31,6 +31,7 @@ target_sources(MASTEAL PRIVATE
     Source/Processor.cpp
     Source/Editor.cpp
     Source/reference/RefTransport.cpp
+    Source/analysis/LoudnessMeter.cpp
     Source/ui/WaveformComponent.cpp)
 
 target_compile_definitions(MASTEAL PRIVATE
@@ -52,9 +53,11 @@ target_sources(MASTEAL_Tests PRIVATE
     Tests/Main.cpp
     Tests/TestSharedState.cpp
     Tests/TestRefTransport.cpp
+    Tests/TestLoudness.cpp
     Source/Processor.cpp
     Source/Editor.cpp
     Source/reference/RefTransport.cpp
+    Source/analysis/LoudnessMeter.cpp
     Source/ui/WaveformComponent.cpp)
 
 target_link_libraries(MASTEAL_Tests PRIVATE
