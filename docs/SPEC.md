@@ -95,7 +95,7 @@ Ordine catena: `input → analisi(pre-DSP) → MatchEQ → MidSideEQ → MatchCo
 6. Match EQ: su riferimento più brillante, l'output guadagna alte frequenze; delta ≤ ±curve target. *Come si verifica:* unit test con sweep/rumore rosa.
 7. Match dinamico: su riferimento più compresso, l'output riduce il proprio dynamic range verso il target. *Come si verifica:* unit test con segnale a dinamica nota.
 8. Fingerprint save/load: salvando `.mastealref` da un'istanza e caricandolo in un'altra (anche senza file audio), le misure target e il comportamento di match sono identici. *Come si verifica:* due progetti FL, save/load, confronto meter.
-9. Latenza dichiarata correttamente (compensazione DAW attiva, nessun flam suTransienti multicanale). *Come si verifica:* stessa sorgente su due canali, uno con plugin → allineamento in FL.
+9. Latenza dichiarata correttamente (compensazione DAW attiva, nessun flam su transienti multi-canale). *Come si verifica:* stessa sorgente su due canali, uno con plugin → allineamento in FL.
 10. CPU: ≤ ~15% di un core M-series con match completo attivo e buffer 256. *Come si verifica:* meter CPU di FL Studio.
 
 ## Dati persistenti
