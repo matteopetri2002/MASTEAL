@@ -19,7 +19,7 @@ Metodo di lavoro: `checklist-agentica-completa.md` dell'utente (fasi 0→7, Issu
 
 - **Fase:** 5 — loop di sviluppo (backlog approvato, Issue #1–14 create)
 - **Repository:** https://github.com/matteopetri2002/MASTEAL
-- **Prossimo passo:** Issue #1 — skeleton CMake+JUCE 8, plugin passthrough che si carica in FL Studio.
+- **Prossimo passo:** Issue #2 — parametri APVTS e SharedState lock-free.
 
 ## Procedura di bootstrap (sintesi)
 
@@ -57,9 +57,8 @@ Metodo di lavoro: `checklist-agentica-completa.md` dell'utente (fasi 0→7, Issu
 ## Da fare
 
 ### Step attuale
-- [x] Utente approva il backlog Issue (fase 4) — approvato il 2026-11-06
-- [x] Creazione Issue con `gh issue create` e verifica con `gh issue list` (14 Issue, numeri 1–14 corrispondenti)
-- [ ] Avvio Issue #1: skeleton CMake+JUCE, plugin che si carica in FL Studio
+- [x] Issue #1 completata (PR #15, squash-merge `50fc8db`, review umana FL Studio OK)
+- [ ] Issue #2 — feat: parametri APVTS e SharedState lock-free
 
 ### Backlog (ordine di lavoro = numero Issue)
 
@@ -95,6 +94,7 @@ riferimento riusa gli stessi analyzer del realtime. Contenuto e dipendenze invar
 - **2026-11-06** — Fasi 1–3: scritti README.md, AGENTS.md, docs/SPEC.md, docs/ARCHITECTURE.md, docs/GUIDA.md. Bootstrap repo e protezione `main`.
 - **2026-11-06** — Fase 4: backlog approvato dall'utente, create 14 Issue (#1–#14) con verifica numerazione. Aggiustamento tecnico d'ordine: meter (#4–5) prima di OfflineAnalysis/Fingerprint (#6). Avvio Issue #1.
 - **2026-11-06** — Issue #1: prima build fallita per Command Line Tools corrotti (`'algorithm' file not found`, `usr/include/c++/v1` con soli 3 file, nessuna ricevuta pkgutil). Utente reinstallato i CLT (ora clang 21): toolchain verificato OK. Vedi "Lezioni apprese".
+- **2026-11-06** — Issue #1 chiusa: PR #15 squash-mergiata in develop (`50fc8db`), branch eliminato, review umana OK in FL Studio (passthrough invariato, GUI placeholder, nessun crash). Fix lungo la strada: `LANGUAGES C CXX`, API `UnitTestRunner` (somma `getResult(i)->failures`), `add_test` con `$<TARGET_FILE:...>`, `BUNDLE_ID` esplicito senza spazi.
 
 ## Lezioni apprese
 
