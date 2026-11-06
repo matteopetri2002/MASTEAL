@@ -254,9 +254,14 @@ void Processor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer
     juce::ScopedNoDenormals noDenormals;
 
     // === pre-DSP analysis tap (ALWAYS first: measure the untouched input) ====
-    if (buffer.getNumChannels() >= 2 && buffer.getNumSamples() > 0)
+    if (buffer.getNumSamples() > 0 && buffer.getNumChannels() > 0)
     {
-        const float* src[2] = { buffer.getReadPointer (0), buffer.getReadPointer (1) };
+        // mono-bus (FL can open the plugin on mono->stereo): duplicate ch0 so
+        // the meters still see full-scale content.
+        const float* src[2] = { buffer.getReadPointer (0),
+                                buffer.getNumChannels() > 1
+                                    ? buffer.getReadPointer (1)
+                                    : buffer.getReadPointer (0) };
         analysisRing.push (src, buffer.getNumSamples());   // lock-free, drops on overflow
     }
 

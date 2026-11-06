@@ -62,7 +62,8 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>   bypassAttach, abAttach;
 
     // --- measurement readouts (SharedState) ------------------------------------
-    juce::Label inputLufsLabel, refLufsLabel, inputTpLabel, refTpLabel, statusLabel;
+    juce::Label inLufsMLabel, inLufsSLabel, inLufsILabel, inTpLabel;
+    juce::Label refLufsLabel, refTpLabel, statusLabel;
 
     std::unique_ptr<juce::FileChooser> fileChooser;
 

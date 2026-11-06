@@ -1,3 +1,6 @@
+#include <atomic>
+#include <thread>
+
 #include <juce_core/juce_core.h>
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "../Source/analysis/LoudnessMeter.h"
@@ -255,6 +258,89 @@ public:
 
             const float tpDb = proc->getSharedState().inputTruePeakDbtp.load (std::memory_order_relaxed);
             expectWithinAbsoluteError (tpDb, -23.0f, 0.4f); // true peak = amp of the -23 LUFS tone
+        }
+
+        beginTest ("FL-like stress: prepare x2, small blocks on another thread, resize torture");
+        {
+            std::unique_ptr<juce::AudioProcessor> owned (createPluginFilter());
+            auto* proc = dynamic_cast<Processor*> (owned.get());
+            expect (proc != nullptr);
+
+            // FL re-prepares on device changes; meters must survive both calls.
+            proc->prepareToPlay (44100.0, 64);
+            proc->prepareToPlay (44100.0, 64);
+
+            // Background "audio callback": 64-sample sine frames for ~1.5 s.
+            const double amp = amplitudeForLufsStereo (-23.0) * 2.0;  // ~ -17 LUFS, hard to miss
+            std::atomic<bool> stopFeeder { false };
+            std::atomic<int> blocksProcessed { 0 };
+            std::thread feeder ([proc, amp, &stopFeeder, &blocksProcessed]
+            {
+                juce::MidiBuffer midi;
+                while (! stopFeeder.load (std::memory_order_relaxed))
+                {
+                    juce::AudioBuffer<float> frame (2, 64);
+                    frame.clear();
+                    for (int i = 0; i < 64; ++i)
+                    {
+                        const double t = 2.0 * kPi * 997.0 * (double) i / 44100.0;
+                        frame.setSample (0, i, (float) (amp * std::sin (t)));
+                        frame.setSample (1, i, (float) (amp * std::sin (t)));
+                    }
+                    proc->processBlock (frame, midi);
+                    ++blocksProcessed;
+                    juce::Thread::sleep (2);
+                }
+            });
+
+            // Resize torture while the audio runs: every child must keep
+            // non-zero bounds across the whole range.
+            {
+                std::unique_ptr<juce::AudioProcessorEditor> ed (proc->createEditor());
+                expect (ed != nullptr);
+
+                const juce::Point<int> sizes[] = { { 760, 620 }, { 620, 500 }, { 630, 505 },
+                                                   { 1600, 1200 }, { 620, 1200 },
+                                                   { 1600, 500 }, { 900, 700 } };
+                for (const auto& s : sizes)
+                {
+                    ed->setSize (s.x, s.y);
+                    ed->resized();
+                    for (auto* c : ed->getChildren())
+                        expect (c->getWidth() > 0 && c->getHeight() > 0);
+                }
+            }
+
+            // Meters must publish real values from the background feed.
+            float inI = SharedState::kSilenceLufs;
+            float inTp = SharedState::kSilenceDbtp;
+            for (int tries = 0; tries < 200 && blocksProcessed.load() < 250; ++tries)
+                juce::Thread::sleep (20);
+
+            for (int tries = 0; tries < 150; ++tries)
+            {
+                auto& st = proc->getSharedState();
+                inI  = st.inputLufsIntegrated.load (std::memory_order_relaxed);
+                inTp = st.inputTruePeakDbtp.load (std::memory_order_relaxed);
+                if (inI > SharedState::kSilenceLufs && inTp > SharedState::kSilenceDbtp)
+                    break;
+                juce::Thread::sleep (20);
+            }
+
+            stopFeeder.store (true, std::memory_order_relaxed);
+            feeder.join();
+
+            expect (inI > SharedState::kSilenceLufs + 20.0f);   // way above silence floor
+            expect (inTp > SharedState::kSilenceDbtp + 20.0f);
+
+            // Re-prepare while meters dead: no crash, editor recreatable.
+            proc->prepareToPlay (44100.0, 128);
+            juce::MidiBuffer midi;
+            juce::AudioBuffer<float> frame (2, 128);
+            frame.clear();
+            proc->processBlock (frame, midi);
+            std::unique_ptr<juce::AudioProcessorEditor> ed2 (proc->createEditor());
+            expect (ed2 != nullptr);
         }
     }
 };
