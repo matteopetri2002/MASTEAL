@@ -29,7 +29,9 @@ juce_add_plugin(MASTEAL
 
 target_sources(MASTEAL PRIVATE
     Source/Processor.cpp
-    Source/Editor.cpp)
+    Source/Editor.cpp
+    Source/reference/RefTransport.cpp
+    Source/ui/WaveformComponent.cpp)
 
 target_compile_definitions(MASTEAL PRIVATE
     JUCE_WEB_BROWSER=0
@@ -48,7 +50,12 @@ juce_add_console_app(MASTEAL_Tests)
 
 target_sources(MASTEAL_Tests PRIVATE
     Tests/Main.cpp
-    Tests/TestSharedState.cpp)
+    Tests/TestSharedState.cpp
+    Tests/TestRefTransport.cpp
+    Source/Processor.cpp
+    Source/Editor.cpp
+    Source/reference/RefTransport.cpp
+    Source/ui/WaveformComponent.cpp)
 
 target_link_libraries(MASTEAL_Tests PRIVATE
     juce::juce_audio_utils

@@ -21,15 +21,41 @@ namespace
 
 //==============================================================================
 Editor::Editor (Processor& p)
-    : AudioProcessorEditor (p), proc (p)
+    : AudioProcessorEditor (p),
+      proc (p),
+      waveform (p.getRefTransport())
 {
     setTitle ("MASTEAL editor");
     setResizable (true, true);
-    setResizeLimits (560, 420, 1600, 1200);
-    setSize (720, 480);
+    setResizeLimits (620, 500, 1600, 1200);
+    setSize (760, 620);
 
     auto& apvts = proc.getValueTreeState();
 
+    // --- transport UI -----------------------------------------------------------
+    loadButton.onClick = [this]
+    {
+        fileChooser = std::make_unique<juce::FileChooser> ("Load reference audio",
+            juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.mp3");
+        auto flags = juce::FileBrowserComponent::openMode
+                   | juce::FileBrowserComponent::canSelectFiles;
+        fileChooser->launchAsync (flags, [this] (const juce::FileChooser& fc)
+        {
+            const auto f = fc.getResult();
+            if (f.existsAsFile())
+                proc.getRefTransport().loadFile (f);
+        });
+    };
+
+    playButton.onClick = [this] { proc.getRefTransport().startPlayback(); };
+    stopButton.onClick = [this] { proc.getRefTransport().stopPlayback(); };
+    loopToggle.setToggleState (true, juce::dontSendNotification);
+    loopToggle.onClick = [this]
+    {
+        proc.getRefTransport().setLooping (loopToggle.getToggleState());
+    };
+
+    // --- parameter attachments --------------------------------------------------
     amountSlider.setRange (0.0, 100.0);
     amountAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (apvts, "amount", amountSlider);
     amountSlider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 80, 20);
@@ -57,15 +83,21 @@ Editor::Editor (Processor& p)
     bypassAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (apvts, "bypass", bypassToggle);
     abAttach     = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (apvts, "abMonitor", abToggle);
 
+    // --- readouts ---------------------------------------------------------------
     setupReadout (inputLufsLabel, "Input LUFS (S)");
     setupReadout (refLufsLabel,   "Ref LUFS (I)");
     setupReadout (inputTpLabel,   "Input True Peak");
     setupReadout (refTpLabel,     "Ref True Peak");
     statusLabel.setText ("No reference loaded", juce::dontSendNotification);
-    statusLabel.setJustificationType (juce::Justification::centred);
+    statusLabel.setJustificationType (juce::Justification::centredLeft);
     statusLabel.setColour (juce::Label::textColourId, juce::Colour (0xff8a8f9c));
 
-    for (auto* c : { static_cast<juce::Component*> (&amountSlider),
+    for (auto* c : { static_cast<juce::Component*> (&loadButton),
+                     static_cast<juce::Component*> (&playButton),
+                     static_cast<juce::Component*> (&stopButton),
+                     static_cast<juce::Component*> (&loopToggle),
+                     static_cast<juce::Component*> (&waveform),
+                     static_cast<juce::Component*> (&amountSlider),
                      static_cast<juce::Component*> (&eqToggle),
                      static_cast<juce::Component*> (&stereoToggle),
                      static_cast<juce::Component*> (&dynToggle),
@@ -89,18 +121,30 @@ Editor::Editor (Processor& p)
 void Editor::timerCallback()
 {
     updateMeasurementLabels();
+
+    // Transport readouts that live outside SharedState (playhead refresh).
+    const auto& transport = proc.getRefTransport();
+    const juce::String status = transport.isLoading()
+        ? "Loading reference..."
+        : transport.hasClip()
+            ? (transport.isPlaying() ? "Playing: " : "Loaded: ") + transport.getClipName()
+            : (transport.getLoadErrorText().isNotEmpty()
+                ? "Load error: " + transport.getLoadErrorText()
+                : juce::String ("No reference loaded"));
+    statusLabel.setText (status, juce::dontSendNotification);
+
+    waveform.repaint();
 }
 
 void Editor::updateMeasurementLabels()
 {
     auto& s = proc.getSharedState();
 
-    const bool refLoaded  = s.referenceLoaded.load (std::memory_order_relaxed);
-    const bool abActive   = s.abMonitorActive.load (std::memory_order_relaxed);
-    const float inLufs    = s.inputLufsShortTerm.load (std::memory_order_relaxed);
-    const float refLufs   = s.refLufsIntegrated.load (std::memory_order_relaxed);
-    const float inTp      = s.inputTruePeakDbtp.load (std::memory_order_relaxed);
-    const float refTp     = s.refTruePeakDbtp.load (std::memory_order_relaxed);
+    const bool refLoaded = s.referenceLoaded.load (std::memory_order_relaxed);
+    const float inLufs   = s.inputLufsShortTerm.load (std::memory_order_relaxed);
+    const float refLufs  = s.refLufsIntegrated.load (std::memory_order_relaxed);
+    const float inTp     = s.inputTruePeakDbtp.load (std::memory_order_relaxed);
+    const float refTp    = s.refTruePeakDbtp.load (std::memory_order_relaxed);
 
     inputLufsLabel.setText ("Input LUFS (S): " + juce::String (inLufs, 1), juce::dontSendNotification);
     inputTpLabel.setText   ("Input True Peak: " + juce::String (inTp, 1) + " dBTP", juce::dontSendNotification);
@@ -109,10 +153,22 @@ void Editor::updateMeasurementLabels()
                                     : "Ref LUFS (I): —", juce::dontSendNotification);
     refTpLabel.setText   (refLoaded ? "Ref True Peak: " + juce::String (refTp, 1) + " dBTP"
                                     : "Ref True Peak: —", juce::dontSendNotification);
+}
 
-    statusLabel.setText (abActive ? "A/B: monitoring reference"
-                                  : (refLoaded ? "Reference loaded" : "No reference loaded"),
-                         juce::dontSendNotification);
+//==============================================================================
+bool Editor::isInterestedInFileDrag (const juce::StringArray& files)
+{
+    (void) files;
+    return true;
+}
+
+void Editor::filesDropped (const juce::StringArray& files, int x, int y)
+{
+    juce::ignoreUnused (x, y);
+    if (files.isEmpty())
+        return;
+
+    proc.getRefTransport().loadFile (juce::File (files[0]));
 }
 
 //==============================================================================
@@ -133,37 +189,43 @@ void Editor::resized()
 
     auto body = area.reduced (16);
 
-    // Left column: controls.
-    auto left = body.removeFromLeft (260);
-    statusLabel.setBounds (left.removeFromTop (28));
-    left.removeFromTop (8);
+    // Transport row.
+    auto transportRow = body.removeFromTop (30);
+    loadButton.setBounds (transportRow.removeFromLeft (80));
+    playButton.setBounds (transportRow.removeFromLeft (64));
+    stopButton.setBounds (transportRow.removeFromLeft (64));
+    loopToggle.setBounds (transportRow.removeFromLeft (72));
 
-    amountSlider.setBounds (left.removeFromTop (120));
-    left.removeFromTop (8);
+    // Waveform.
+    body.removeFromTop (6);
+    waveform.setBounds (body.removeFromTop (body.getHeight() * 0.42f));
 
-    modeCombo.setBounds (left.removeFromTop (28));
-    left.removeFromTop (8);
+    // Readouts (right column of the remaining space).
+    body.removeFromTop (10);
+    inputLufsLabel.setBounds (body.removeFromTop (26));
+    refLufsLabel.setBounds   (body.removeFromTop (26));
+    inputTpLabel.setBounds   (body.removeFromTop (26));
+    refTpLabel.setBounds     (body.removeFromTop (26));
+    body.removeFromTop (6);
 
+    auto bottom = body;
+    auto controls = bottom.removeFromLeft (300);
+    modeCombo.setBounds (controls.removeFromTop (26));
+    controls.removeFromTop (6);
     for (auto* t : { &eqToggle, &stereoToggle, &dynToggle, &loudnessToggle })
     {
-        t->setBounds (left.removeFromTop (26));
-        left.removeFromTop (2);
+        t->setBounds (controls.removeFromTop (26));
+        controls.removeFromTop (2);
     }
-    left.removeFromTop (6);
+    controls.removeFromTop (6);
 
-    bypassToggle.setBounds (left.removeFromTop (26));
-    abToggle.setBounds (left.removeFromTop (26));
-    left.removeFromTop (8);
+    bypassToggle.setBounds (controls.removeFromTop (26));
+    abToggle.setBounds (controls.removeFromTop (26));
 
-    targetLufsSlider.setBounds (left.removeFromTop (32));
-    targetTpSlider.setBounds (left.removeFromTop (32));
-
-    // Right column: measurement readouts (placeholders until issue #4+ meters).
-    body.removeFromLeft (16);
-    inputLufsLabel.setBounds (body.removeFromTop (28));
-    refLufsLabel.setBounds   (body.removeFromTop (28));
-    inputTpLabel.setBounds   (body.removeFromTop (28));
-    refTpLabel.setBounds     (body.removeFromTop (28));
+    bottom.removeFromLeft (16);
+    amountSlider.setBounds (bottom.removeFromTop (110));
+    targetLufsSlider.setBounds (bottom.removeFromTop (30));
+    targetTpSlider.setBounds (bottom.removeFromTop (30));
 }
 
 //==============================================================================
