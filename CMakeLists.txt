@@ -47,7 +47,8 @@ target_link_libraries(MASTEAL PRIVATE
 juce_add_console_app(MASTEAL_Tests)
 
 target_sources(MASTEAL_Tests PRIVATE
-    Tests/Main.cpp)
+    Tests/Main.cpp
+    Tests/TestSharedState.cpp)
 
 target_link_libraries(MASTEAL_Tests PRIVATE
     juce::juce_audio_utils
