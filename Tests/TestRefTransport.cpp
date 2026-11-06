@@ -185,6 +185,46 @@ public:
             expect (pos >= 1024 && pos <= 44100);
         }
 
+        beginTest ("editor lifecycle open/close x3 does not corrupt");
+        {
+            std::unique_ptr<juce::AudioProcessor> owned (createPluginFilter());
+            auto* proc = dynamic_cast<masteal::Processor*> (owned.get());
+            expect (proc != nullptr);
+            proc->prepareToPlay (44100.0, 512);
+
+            juce::AudioBuffer<float> buffer (2, 256);
+            juce::MidiBuffer midi;
+
+            for (int i = 0; i < 3; ++i)
+            {
+                std::unique_ptr<juce::AudioProcessorEditor> ed (proc->createEditor());
+                expect (ed != nullptr);
+                ed->resized();
+                buffer.clear();
+                proc->processBlock (buffer, midi); // audio while an editor is open
+                ed.reset();
+                buffer.clear();
+                proc->processBlock (buffer, midi); // audio with no editor
+            }
+        }
+
+        beginTest ("safe teardown while a load is in flight");
+        {
+            juce::TemporaryFile temp (".wav");
+            juce::AudioBuffer<float> content (2, 44100);
+            fillSine (content, 220.0f, 0.9f);
+            const auto file = writeTestWav (temp.getFile(), content, 2);
+
+            std::unique_ptr<juce::AudioProcessor> owned (createPluginFilter());
+            auto* proc = dynamic_cast<masteal::Processor*> (owned.get());
+            expect (proc != nullptr);
+            proc->prepareToPlay (44100.0, 512);
+            proc->getRefTransport().loadFile (file); // async job starts
+
+            owned.reset(); // destructor must join the loader job, never free it mid-write
+            expect (createPluginFilter() != nullptr); // and the suite keeps running
+        }
+
         beginTest ("processor bypass: output is bit-exact input");
         {
             juce::TemporaryFile temp (".wav");

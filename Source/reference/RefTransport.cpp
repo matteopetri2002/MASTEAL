@@ -37,12 +37,19 @@ RefTransport::RefTransport()
     : formatManager()
 {
     formatManager.registerBasicFormats(); // WAV/AIFF always; FLAC/MP3 per JUCE options
+    loaderPool = std::make_unique<juce::ThreadPool> (1); // serial decode, one file at a time
 }
 
 RefTransport::~RefTransport()
 {
     cancelPendingUpdate();
     stopPlayback();
+
+    // Block until any pending decode finishes (bounded): never let a job
+    // touch juce members after this object is gone.
+    if (loaderPool != nullptr)
+        loaderPool->removeAllJobs (true, 30000);
+    loaderPool.reset();
 }
 
 //==============================================================================
@@ -50,15 +57,20 @@ void RefTransport::loadFile (const juce::File& file)
 {
     loading.store (true, std::memory_order_relaxed);
 
-    // v1: detached loader thread, fire and forget (the transport outlives the
-    // editor in a DAW session). Issue #7 may move it to a named ThreadPool.
-    std::thread ([this, file]
+    // Owned pool: jobs are joined in the destructor (bounds-limited), so the
+    // transport can be destroyed safely while a load is in flight.
+    if (loaderPool != nullptr)
     {
-        RefClipPtr clip;
-        decodeInto (file, clip);
-        installClip (std::move (clip));
-        loading.store (false, std::memory_order_relaxed);
-    }).detach();
+        loaderPool->addJob ([this, file]
+        {
+            RefClipPtr clip;
+            decodeInto (file, clip);
+            installClip (std::move (clip));
+            loading.store (false, std::memory_order_relaxed);
+        });
+    }
+    else // deck problem: fall back to synchronous
+        loadFileSync (file);
 }
 
 void RefTransport::loadFileSync (const juce::File& file)
@@ -73,6 +85,8 @@ void RefTransport::loadFileSync (const juce::File& file)
 //==============================================================================
 void RefTransport::decodeInto (const juce::File& file, RefClipPtr& outClip)
 {
+    const juce::ScopedLock errorScope (errorLock); // lastError shared with the UI only
+
     if (! file.existsAsFile())
     {
         lastError = "File not found: " + file.getFileName();
@@ -241,7 +255,8 @@ juce::String RefTransport::getClipName() const
 
 juce::String RefTransport::getLoadErrorText() const
 {
-    return lastError; // message-thread-owned
+    const juce::ScopedLock errorScope (errorLock);
+    return lastError; // copy under lock: juce::String is not thread-safe cross-thread
 }
 
 //==============================================================================

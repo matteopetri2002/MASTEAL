@@ -132,8 +132,14 @@ private:
 
     SharedState* state = nullptr;
 
-    // loader messaging (message thread)
+    //==========================================================================
+    // loader thread pool (owned; jobs joined in the destructor — no detached
+    // threads that could outlive the transport and corrupt the heap)
+    std::unique_ptr<juce::ThreadPool> loaderPool;
+
+    // loader messaging (message+loader thread, accessed under errorLock)
     juce::String lastError;
+    mutable juce::CriticalSection errorLock;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RefTransport)
 };

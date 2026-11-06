@@ -35,19 +35,35 @@ Editor::Editor (Processor& p)
     // --- transport UI -----------------------------------------------------------
     loadButton.onClick = [this]
     {
+        juce::Component::SafePointer<Editor> safeThis { this };
+
         fileChooser = std::make_unique<juce::FileChooser> ("Load reference audio",
             juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.mp3");
         auto flags = juce::FileBrowserComponent::openMode
                    | juce::FileBrowserComponent::canSelectFiles;
-        fileChooser->launchAsync (flags, [this] (const juce::FileChooser& fc)
+
+        // SafePointer: if the editor closes while the chooser is open, the
+        // callback becomes a no-op instead of dereferencing freed memory.
+        fileChooser->launchAsync (flags, [safeThis] (const juce::FileChooser& fc)
         {
+            if (safeThis == nullptr)
+                return;
+
             const auto f = fc.getResult();
             if (f.existsAsFile())
-                proc.getRefTransport().loadFile (f);
+                safeThis->proc.getRefTransport().loadFile (f);
         });
     };
 
-    playButton.onClick = [this] { proc.getRefTransport().startPlayback(); };
+    // Play implies monitoring the reference (usable without toggling A/B too):
+    // it raises the abMonitor parameter so automation and host state stay honest.
+    playButton.onClick = [this]
+    {
+        if (auto* ab = dynamic_cast<juce::AudioParameterBool*> (
+                proc.getValueTreeState().getParameter ("abMonitor")))
+            ab->setValueNotifyingHost (1.0f);
+        proc.getRefTransport().startPlayback();
+    };
     stopButton.onClick = [this] { proc.getRefTransport().stopPlayback(); };
     loopToggle.setToggleState (true, juce::dontSendNotification);
     loopToggle.onClick = [this]
@@ -115,6 +131,15 @@ Editor::Editor (Processor& p)
         addAndMakeVisible (c);
 
     startTimerHz (30); // UI refresh from SharedState (~30 Hz, never from audio thread)
+}
+
+//==============================================================================
+Editor::~Editor()
+{
+    // Order matters: no timer, chooser or modal callbacks outlive this object.
+    stopTimer();
+    fileChooser.reset();
+    juce::ModalComponentManager::getInstance()->cancelAllModalComponents();
 }
 
 //==============================================================================

@@ -20,6 +20,7 @@ class Editor : public juce::AudioProcessorEditor,
 {
 public:
     explicit Editor (Processor& p);
+    ~Editor() override;
 
     void paint (juce::Graphics& g) override;
     void resized() override;
@@ -40,19 +41,25 @@ private:
     juce::TextButton stopButton { "Stop" };
     juce::ToggleButton loopToggle { "Loop" };
 
-    // --- controls (APVTS attachments) -----------------------------------------
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   amountAttach;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>   eqAttach, stereoAttach, dynAttach, loudnessAttach;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> modeAttach;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   targetLufsAttach, targetTpAttach;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>   bypassAttach, abAttach;
-
+    // --- controls ---------------------------------------------------------------
     juce::Slider       amountSlider { juce::Slider::RotaryVerticalDrag, juce::Slider::TextBoxBelow };
     juce::ToggleButton eqToggle, stereoToggle, dynToggle, loudnessToggle;
     juce::ComboBox     modeCombo;
     juce::Slider       targetLufsSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight },
                        targetTpSlider   { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     juce::ToggleButton bypassToggle, abToggle;
+
+    // --- APVTS attachments ---------------------------------------------------------
+    // CRITICAL (JUCE lifetime rule): these MUST be declared AFTER the controls
+    // they attach to. Members are destroyed in reverse order, and each attachment
+    // removes itself from its control's listener list in its destructor — if the
+    // control is destroyed first, that is a use-after-free (the FL Studio
+    // close-window heap corruption).
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   amountAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>   eqAttach, stereoAttach, dynAttach, loudnessAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> modeAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   targetLufsAttach, targetTpAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>   bypassAttach, abAttach;
 
     // --- measurement readouts (SharedState) ------------------------------------
     juce::Label inputLufsLabel, refLufsLabel, inputTpLabel, refTpLabel, statusLabel;
