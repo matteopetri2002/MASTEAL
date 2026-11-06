@@ -17,9 +17,9 @@ Metodo di lavoro: `checklist-agentica-completa.md` dell'utente (fasi 0→7, Issu
 
 ## Stato attuale
 
-- **Fase:** 5 — loop di sviluppo (backlog approvato, Issue #1–14 create)
+- **Fase:** 5 — loop di sviluppo (Issue #1 e #2 chiuse; 12 rimanenti)
 - **Repository:** https://github.com/matteopetri2002/MASTEAL
-- **Prossimo passo:** Issue #2 — parametri APVTS e SharedState lock-free.
+- **Prossimo passo:** Issue #3 — RefTransport: import file, waveform, trasporto, A/B.
 
 ## Procedura di bootstrap (sintesi)
 
@@ -57,8 +57,8 @@ Metodo di lavoro: `checklist-agentica-completa.md` dell'utente (fasi 0→7, Issu
 ## Da fare
 
 ### Step attuale
-- [x] Issue #1 completata (PR #15, squash-merge `50fc8db`, review umana FL Studio OK)
-- [ ] Issue #2 — feat: parametri APVTS e SharedState lock-free
+- [x] Issue #1 e #2 completate (PR #15 e #16, review umana FL Studio OK)
+- [ ] Issue #3 — feat: RefTransport — import file, waveform, trasporto, A/B
 
 ### Backlog (ordine di lavoro = numero Issue)
 
@@ -83,6 +83,7 @@ riferimento riusa gli stessi analyzer del realtime. Contenuto e dipendenze invar
 
 ## Aperto / da decidere
 
+- **GUI definitiva "di livello professionale" (richiesta esplicita utente, 2026-11-06):** aspetto super moderno e comprensibile, visualizzazione spettro audio e simili, al pari dei plugin commerciali. Già coperta dal backlog: Issue #7 (LookAndFeel, delta card, SpectrumView) e Issue #14 (polish v1). Refinement visivo aggiuntivo va deciso dopo #7 sulla base di ciò che sarà funzionale.
 - Nome commerciale definitivo e branding della GUI (il plugin si chiama MASTEAL; logo/font da decidere).
 - Se il LUFS di match default sarà *integrated* o *short-term* (in SPEC entrambi selezionabili; default proposto: short-term).
 - Distribuzione v1: solo `.vst3` buildato localmente o anche release GitHub con binario?
@@ -95,6 +96,7 @@ riferimento riusa gli stessi analyzer del realtime. Contenuto e dipendenze invar
 - **2026-11-06** — Fase 4: backlog approvato dall'utente, create 14 Issue (#1–#14) con verifica numerazione. Aggiustamento tecnico d'ordine: meter (#4–5) prima di OfflineAnalysis/Fingerprint (#6). Avvio Issue #1.
 - **2026-11-06** — Issue #1: prima build fallita per Command Line Tools corrotti (`'algorithm' file not found`, `usr/include/c++/v1` con soli 3 file, nessuna ricevuta pkgutil). Utente reinstallato i CLT (ora clang 21): toolchain verificato OK. Vedi "Lezioni apprese".
 - **2026-11-06** — Issue #1 chiusa: PR #15 squash-mergiata in develop (`50fc8db`), branch eliminato, review umana OK in FL Studio (passthrough invariato, GUI placeholder, nessun crash). Fix lungo la strada: `LANGUAGES C CXX`, API `UnitTestRunner` (somma `getResult(i)->failures`), `add_test` con `$<TARGET_FILE:...>`, `BUNDLE_ID` esplicito senza spazi.
+- **2026-11-06** — Issue #2 chiusa: PR #16 squash-mergiata (`8572ea0`). 10 parametri APVTS + SharedState lock-free + harness test SharedState. Feedback utente esplicito: GUI finale da portare a livello "plugin professionale" (assegnata a #7/#14, registrata in "Aperto / da decidere").
 
 ## Lezioni apprese
 
