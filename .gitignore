@@ -1,0 +1,16 @@
+# File di sistema macOS
+.DS_Store
+
+# Build CMake/JUCE (include JUCE scaricato via FetchContent)
+build/
+cmake-build-*/
+
+# Plugin buildati
+*.vst3
+
+# Note personali escluse dal repo (per decisione, vedi docs/GUIDA.md)
+appunti-modelli-opencode-go.md
+checklist-agentica-completa.md
+
+# Segreti
+.env
